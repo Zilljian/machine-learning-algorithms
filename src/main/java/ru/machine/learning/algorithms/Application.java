@@ -1,4 +1,4 @@
-package ru.k.nearest.neighbors;
+package ru.machine.learning.algorithms;
 
 import com.google.common.collect.Streams;
 import org.apache.spark.ml.feature.StringIndexer;

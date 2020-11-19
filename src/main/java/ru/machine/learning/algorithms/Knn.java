@@ -1,4 +1,4 @@
-package ru.k.nearest.neighbors;
+package ru.machine.learning.algorithms;
 
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
