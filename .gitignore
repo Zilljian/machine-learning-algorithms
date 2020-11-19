@@ -1,2 +1,4 @@
 # Project exclude paths
 /target/
+/.idea
+machine-learning.iml
