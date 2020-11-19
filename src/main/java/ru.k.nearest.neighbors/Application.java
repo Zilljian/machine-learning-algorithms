@@ -3,7 +3,9 @@ package ru.k.nearest.neighbors;
 import com.google.common.collect.Streams;
 import org.apache.spark.ml.feature.StringIndexer;
 import org.apache.spark.sql.SparkSession;
+import tech.tablesaw.api.Table;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -17,7 +19,25 @@ public class Application {
     private static final String TEST = Thread.currentThread().getContextClassLoader().getResource("test.csv").getPath();
     private static final String LABELS = Thread.currentThread().getContextClassLoader().getResource("test_labels.csv").getPath();
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        var testTable = Table.read().file("test.csv");
+        var testLabels = Table.read().file("test_labels.csv");
+        var trainTable = Table.read().file("train.csv");
+
+        testLabels.removeColumns("PassengerId");
+        var uniqueSex = testTable.column("Sex").unique().asList();
+        var uniqueEmbarked = testTable.column("Embarked").unique().asList();
+
+        /*testTable = Table.create(testTable.stream()
+            .map(r -> {
+                r.setInt("Sex", uniqueSex.indexOf(r.getString("Sex")));
+                return r;
+            }).map(r -> {
+            r.setInt("Embarked", uniqueEmbarked.indexOf(r.getString("Embarked")));
+            return r;
+        }));*/
+
+
         var session = SparkSession.builder()
             .config("spark.master", "local")
             .master("local[*]")
