@@ -1,107 +1,89 @@
 package ru.machine.learning.algorithms;
 
-import com.google.common.collect.Streams;
-import org.apache.spark.ml.feature.StringIndexer;
-import org.apache.spark.sql.SparkSession;
+import io.vavr.collection.HashMap;
+import io.vavr.collection.List;
+import io.vavr.collection.Map;
+import io.vavr.collection.Traversable;
+import ru.machine.learning.algorithms.knn.Knn;
+import ru.machine.learning.algorithms.utils.TrainTestSplit;
+import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Table;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.groupingBy;
 
 public class Application {
 
-    private static final String TRAIN = Thread.currentThread().getContextClassLoader().getResource("train.csv").getPath();
-    private static final String TEST = Thread.currentThread().getContextClassLoader().getResource("test.csv").getPath();
-    private static final String LABELS = Thread.currentThread().getContextClassLoader().getResource("test_labels.csv").getPath();
+    private static final String DATA = Thread.currentThread().getContextClassLoader().getResource("train.csv").getPath();
 
     public static void main(String[] args) throws IOException {
-        var testTable = Table.read().file("test.csv");
-        var testLabels = Table.read().file("test_labels.csv");
-        var trainTable = Table.read().file("train.csv");
+        var table = Table.read().file(DATA);
+        System.out.printf("Init table shape: %s\n\n", table.shape());
+        table.removeColumns("Cabin", "Name", "PassengerId", "Ticket", "SibSp", "Parch");
+        var cleanTable = table.dropRowsWithMissingValues();
 
-        testLabels.removeColumns("PassengerId");
-        var uniqueSex = testTable.column("Sex").unique().asList();
-        var uniqueEmbarked = testTable.column("Embarked").unique().asList();
+        var mapEmbarkedToDouble = HashMap.of(
+            "C", 0.0,
+            "Q", 1.0,
+            "S", 2.0);
+        var mapSexToDouble = HashMap.of(
+            "male", 1.0,
+            "female", 0.0);
 
-        /*testTable = Table.create(testTable.stream()
-            .map(r -> {
-                r.setInt("Sex", uniqueSex.indexOf(r.getString("Sex")));
-                return r;
-            }).map(r -> {
-            r.setInt("Embarked", uniqueEmbarked.indexOf(r.getString("Embarked")));
-            return r;
-        }));*/
+        var mappedSex = cleanTable.stringColumn("Sex")
+            .map(s -> mapSexToDouble.getOrElse(s, 1.0), s -> DoubleColumn.create(s, cleanTable.rowCount()));
+        var mappedEmbarked = cleanTable.stringColumn("Embarked")
+            .map(s -> mapEmbarkedToDouble.getOrElse(s, 1.0), s -> DoubleColumn.create(s, cleanTable.rowCount()));
 
+        cleanTable.replaceColumn("Sex", mappedSex);
+        cleanTable.replaceColumn("Embarked", mappedEmbarked);
 
-        var session = SparkSession.builder()
-            .config("spark.master", "local")
-            .master("local[*]")
-            .config("job.local.dir", "file:/Users/ilya/IdeaProjects/k-nearest-neighbors/scr/main/resources")
-            .appName("knn")
-            .getOrCreate();
+        var splitted = TrainTestSplit.split(cleanTable, "Survived", 0.8);
 
-        var encoder = new StringIndexer()
-            .setInputCols(new String[]{"Sex", "Embarked"})
-            .setOutputCols(new String[]{"Sex_cat", "Embarked_cat"});
+        System.out.printf("Full table shape: %s\n\n", cleanTable.shape());
 
-        var test = session.read()
-            .format("csv")
-            .option("header", true)
-            .load(TEST);
-        var labels = session.read()
-            .format("csv")
-            .option("header", true)
-            .load(LABELS)
-            .drop("PassengerId");
+        System.out.printf("Train labels size: %s\n", splitted._3.size());
+        System.out.printf("Class 0 size in test: %s\n", splitted._3.filter(i -> i == 0).size());
+        System.out.printf("Class 1 size in test: %s\n\n", splitted._3.filter(i -> i == 1).size());
 
-        test = encoder.fit(test)
-            .transform(test)
-            .drop("SibSp", "Parch", "Sex", "Embarked");
+        System.out.printf("Test labels size: %s\n", splitted._4.size());
+        System.out.printf("Class 0 size in test: %s\n", splitted._4.filter(i -> i == 0).size());
+        System.out.printf("Class 1 size in test: %s\n\n", splitted._4.filter(i -> i == 1).size());
 
-        var train = session.read()
-            .format("csv")
-            .option("header", true)
-            .load(TRAIN);
-        train = encoder.fit(train)
-            .transform(train)
-            .drop("SibSp", "Parch", "Sex", "Embarked");
+        for (var n : List.range(1, 20)) {
+            System.out.printf("\n\nN = %d\n\n", n);
+            var start = System.nanoTime();
+            var predicted = new Knn(n)
+                .fit(splitted._1, splitted._3)
+                .predict(splitted._2);
+            var end = System.nanoTime();
+            var testLabels = List.ofAll(splitted._4.asList());
 
-        var start = System.currentTimeMillis();
-        var result = new Knn(session, 5).fit(train).predict(test);
-        var end = System.currentTimeMillis();
+            var merge =
+                testLabels.zip(predicted)
+                    .groupBy(t -> {
+                        if (t._1.equals(t._2()) && t._1.equals(0)) {
+                            return "tn";
+                        } else if (t._1.equals(t._2) && t._1.equals(1)) {
+                            return "tp";
+                        } else if (!t._1.equals(t._2) && t._1.equals(0)) {
+                            return "fp";
+                        } else {
+                            return "fn";
+                        }
+                    })
+                    .mapValues(Traversable::size);
 
-        var lb = labels.select("Survived").collectAsList();
+            System.out.printf("Computed in %f.2 seconds\n", (end - start) / 1000000000f);
 
-        session.stop();
-
-        var merge =
-            Streams.zip(lb.stream(), result.entrySet().stream(), Map::entry)
-                .map(e -> Map.entry(Integer.parseInt(e.getKey().getString(0)), Integer.valueOf((String) e.getValue().getValue())))
-                .collect(groupingBy(e -> {
-                    if (e.getKey().equals(e.getValue()) && e.getKey().equals(0)) {
-                        return "tn";
-                    } else if (e.getKey().equals(e.getValue()) && e.getKey().equals(1)) {
-                        return "tp";
-                    } else if (!e.getKey().equals(e.getValue()) && e.getKey().equals(0)) {
-                        return "fp";
-                    } else {
-                        return "fn";
-                    }
-                }));
-        System.out.printf("Compute in %f.2 seconds\n", (end - start) / 1000f);
-        printMetrics(merge);
+            printMetrics(merge);
+        }
     }
 
-    private static void printMetrics(Map<String, List<Entry<Integer, Integer>>> merge) {
-        var truePositive = ofNullable(merge.get("tp")).orElse(List.of()).size();
-        var trueNegative = ofNullable(merge.get("tn")).orElse(List.of()).size();
-        var falsePositive = ofNullable(merge.get("fp")).orElse(List.of()).size();
-        var falseNegative = ofNullable(merge.get("fn")).orElse(List.of()).size();
+    private static void printMetrics(Map<String, Integer> merge) {
+        var truePositive = merge.getOrElse("tp", 0);
+        var trueNegative = merge.getOrElse("tn", 0);
+        var falsePositive = merge.getOrElse("fp", 0);
+        var falseNegative = merge.getOrElse("fn", 0);
 
         var accuracy = (float) (trueNegative + truePositive) /
             (truePositive + trueNegative + falseNegative + falsePositive);
@@ -113,10 +95,17 @@ public class Application {
 
         System.out.printf(
             """
+                True Positive = %d
+                True Negative = %d
+                False Positive = %d
+                False Negative = %d
+                                
                 Accuracy = %f.4
                 Precision = %f.4
                 Recall = %f.4
                 F1 = %f.4
-                """, accuracy, precision, recall, f1);
+                """,
+            truePositive, trueNegative, falsePositive, falseNegative,
+            accuracy, precision, recall, f1);
     }
 }
