@@ -6,6 +6,7 @@ import io.vavr.collection.LinearSeq;
 import io.vavr.collection.List;
 import io.vavr.collection.List.Nil;
 import io.vavr.collection.Traversable;
+import ru.machine.learning.algorithms.Model;
 import tech.tablesaw.api.IntColumn;
 import tech.tablesaw.api.Table;
 
@@ -13,7 +14,7 @@ import javax.annotation.Nonnull;
 
 import static java.util.Comparator.comparing;
 
-public class Knn {
+public class Knn implements Model {
 
     private final int K;
 
@@ -23,6 +24,7 @@ public class Knn {
         this.K = k;
     }
 
+    @Override
     public Knn fit(@Nonnull Table train, @Nonnull IntColumn trainTarget) {
         this.trainRowsToTarget = toList(train)
             .zipWithIndex()
@@ -30,7 +32,8 @@ public class Knn {
         return this;
     }
 
-    public List<Integer> predict(Table test) {
+    @Override
+    public List<Integer> predict(@Nonnull Table test) {
         var testRows = toList(test);
         return testRows
             .map(e -> Tuple.of(e, trainRowsToTarget))
