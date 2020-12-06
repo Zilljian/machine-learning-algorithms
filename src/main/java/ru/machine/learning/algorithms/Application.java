@@ -4,7 +4,7 @@ import io.vavr.collection.HashMap;
 import io.vavr.collection.List;
 import io.vavr.collection.Map;
 import io.vavr.collection.Traversable;
-import ru.machine.learning.algorithms.knn.Knn;
+import ru.machine.learning.algorithms.bayes.GaussianNaiveBayes;
 import ru.machine.learning.algorithms.utils.TrainTestSplit;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Table;
@@ -49,10 +49,13 @@ public class Application {
         System.out.printf("Class 0 size in test: %s\n", splitted._4.filter(i -> i == 0).size());
         System.out.printf("Class 1 size in test: %s\n\n", splitted._4.filter(i -> i == 1).size());
 
-        for (var n : List.range(1, 20)) {
+        for (var n : List.range(1, 2)) {
             System.out.printf("\n\nN = %d\n\n", n);
             var start = System.nanoTime();
-            var predicted = new Knn(n)
+            /*var predicted = new Knn(n)
+                .fit(splitted._1, splitted._3)
+                .predict(splitted._2);*/
+            var predicted = new GaussianNaiveBayes()
                 .fit(splitted._1, splitted._3)
                 .predict(splitted._2);
             var end = System.nanoTime();

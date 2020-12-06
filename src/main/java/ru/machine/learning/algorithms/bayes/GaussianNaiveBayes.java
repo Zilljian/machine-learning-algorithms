@@ -10,8 +10,8 @@ import io.vavr.collection.Set;
 import io.vavr.collection.Stream;
 import io.vavr.collection.Traversable;
 import ru.machine.learning.algorithms.ProbaModel;
-import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.IntColumn;
+import tech.tablesaw.api.NumericColumn;
 import tech.tablesaw.api.Row;
 import tech.tablesaw.api.Table;
 
@@ -28,11 +28,7 @@ public class GaussianNaiveBayes implements ProbaModel {
     @Override
     public GaussianNaiveBayes fit(@Nonnull Table train, @Nonnull IntColumn trainTarget) {
         this.trainTargetLabels = List.ofAll(trainTarget.asList());
-        this.trainColNameToValues = List.ofAll(train.columns())
-            .map(c -> ((DoubleColumn) c).asList())
-            .map(List::ofAll)
-            .zip(List.ofAll(train.columnNames()))
-            .toMap(Tuple2::_2, Tuple2::_1);
+        this.trainColNameToValues = listOnColumn(train);
         return this;
     }
 
@@ -45,9 +41,9 @@ public class GaussianNaiveBayes implements ProbaModel {
     @Override
     public Seq<Tuple2<Integer, Double>> predictProba(@Nonnull Table test) {
         var sd = standardDeviationByColumn();
-        var m = meanByColumn();
+        var mean = meanByColumn();
         var targetLabels = targetLabelsProbabilities().keySet();
-        Function<Row, Tuple2<Integer, Double>> toLabel = r -> internalPredictOnRow(r, sd, m, targetLabels);
+        Function<Row, Tuple2<Integer, Double>> toLabel = r -> internalPredictOnRow(r, mean, sd, targetLabels);
         return Stream.ofAll(test.stream())
             .map(toLabel);
     }
@@ -57,7 +53,7 @@ public class GaussianNaiveBayes implements ProbaModel {
                                                          Map<String, Map<Integer, Double>> sd,
                                                          Set<Integer> targetLabels) {
         return List.ofAll(r.columnNames())
-            .map(n -> Tuple.of(r.getDouble(n), sd.get(n).get(), mean.get(n).get()))
+            .map(n -> Tuple.of(r.getNumber(n), sd.get(n).get(), mean.get(n).get()))
             .flatMap(t3 -> targetLabels
                 .map(tl -> Tuple.of(tl, t3
                          .map2(v -> v.get(tl).get())
@@ -80,6 +76,24 @@ public class GaussianNaiveBayes implements ProbaModel {
             )
             .maxBy(comparing(Tuple2::_2))
             .get();
+    }
+
+    private Map<String, List<Double>> listOnColumn(Table train) {
+        return List.ofAll(train.columns())
+            .map(c -> List.ofAll(((NumericColumn<?>) c).asList())
+                .map(o -> {
+                    if (o instanceof Integer i) {
+                        return (double) i;
+                    } else if (o instanceof Float f) {
+                        return (double) f;
+                    } else {
+                        return (double) o;
+                    }
+                })
+            )
+            .map(List::ofAll)
+            .zip(List.ofAll(train.columnNames()))
+            .toMap(Tuple2::_2, Tuple2::_1);
     }
 
     private Map<Integer, Double> targetLabelsProbabilities() {
