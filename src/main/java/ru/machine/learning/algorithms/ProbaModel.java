@@ -8,5 +8,5 @@ import javax.annotation.Nonnull;
 
 public interface ProbaModel extends Model {
 
-    Seq<Tuple2<Integer, Double>> predictProba(@Nonnull Table test);
+    Seq<Tuple2<Double, Double>> predictProba(@Nonnull Table test);
 }
