@@ -14,26 +14,6 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-core_2.12</artifactId>
-      <version>3.0.1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-sql_2.12</artifactId>
-      <version>LATEST</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-mllib_2.12</artifactId>
-      <version>LATEST</version>
-    </dependency>
-    <dependency>
-      <groupId>joinery</groupId>
-      <artifactId>joinery-dataframe</artifactId>
-      <version>1.8</version>
-    </dependency>
-    <dependency>
       <groupId>tech.tablesaw</groupId>
       <artifactId>tablesaw-core</artifactId>
       <version>LATEST</version>
@@ -44,18 +24,16 @@
       <version>LATEST</version>
     </dependency>
     <dependency>
-      <groupId>tech.tablesaw</groupId>
-      <artifactId>tablesaw-core</artifactId>
-      <version>LATEST</version>
+      <groupId>io.vavr</groupId>
+      <artifactId>vavr</artifactId>
+      <version>0.10.3</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
+      <version>3.6.1</version>
     </dependency>
   </dependencies>
-
-  <repositories>
-    <repository>
-      <id>Spring M</id>
-      <url>https://repo.spring.io/libs-milestone/</url>
-    </repository>
-  </repositories>
 
   <build>
     <plugins>
