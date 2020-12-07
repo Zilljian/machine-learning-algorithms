@@ -22,6 +22,13 @@ import static java.util.Comparator.comparing;
 
 public class Knn implements Model {
 
+    enum Metric {
+        Euclidean,
+        Manhattan,
+        Canberra,
+        Chebyshev
+    }
+
     private final int k;
     private final DistanceMeasure metric;
 
@@ -45,14 +52,13 @@ public class Knn implements Model {
     public static Knn withParams(@Nonnull Map<String, ?> params) {
         var k = (int) params.get("k")
             .getOrElseThrow(() -> new RuntimeException("Param 'k' is expected, but doesn't exist"));
-        var metricName = (String) params.get("metric")
+        var metricName = (Metric) params.get("metric")
             .getOrElseThrow(() -> new RuntimeException("Param 'metric' is expected, but doesn't exist"));
-        var metric = switch (metricName.toLowerCase()) {
-            case "euclidean" -> new EuclideanDistance();
-            case "manhattan" -> new ManhattanDistance();
-            case "canberra" -> new CanberraDistance();
-            case "chebyshev" -> new ChebyshevDistance();
-            default -> throw new IllegalStateException("Unexpected value: " + metricName.toLowerCase());
+        var metric = switch (metricName) {
+            case Euclidean -> new EuclideanDistance();
+            case Manhattan -> new ManhattanDistance();
+            case Canberra -> new CanberraDistance();
+            case Chebyshev -> new ChebyshevDistance();
         };
         return new Knn(k, metric);
     }
