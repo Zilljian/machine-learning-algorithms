@@ -2,27 +2,45 @@ package ru.machine.learning.algorithms.utils;
 
 import io.vavr.Tuple4;
 import io.vavr.collection.List;
-import io.vavr.collection.Map;
+import io.vavr.collection.Seq;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Table;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.DoublePredicate;
 import java.util.function.Supplier;
 
 public class Metrics {
 
-    public static void printClassificationMetrics(Map<String, Integer> merge) {
-        var truePositive = merge.getOrElse("tp", 0);
-        var trueNegative = merge.getOrElse("tn", 0);
-        var falsePositive = merge.getOrElse("fp", 0);
-        var falseNegative = merge.getOrElse("fn", 0);
+    public static void printBinaryClassificationMetrics(Seq<Double> real, Seq<Double> predicted) {
+        var truePositive = new AtomicInteger(0);
+        var trueNegative = new AtomicInteger(0);
+        var falsePositive = new AtomicInteger(0);
+        var falseNegative = new AtomicInteger(0);
 
-        var accuracy = (float) (trueNegative + truePositive) /
-            (truePositive + trueNegative + falseNegative + falsePositive);
-        var precision = (float) truePositive /
-            (truePositive + falsePositive);
-        var recall = (float) truePositive /
-            (truePositive + falseNegative);
+        var classes = real.toSortedSet().toList();
+        var c0 = classes.get(0);
+        var c1 = classes.get(1);
+
+        real.zip(predicted)
+            .forEach(t -> {
+                if (t._1.equals(t._2()) && t._1.equals(c0)) {
+                    trueNegative.incrementAndGet();
+                } else if (t._1.equals(t._2) && t._1.equals(c1)) {
+                    truePositive.incrementAndGet();
+                } else if (!t._1.equals(t._2) && t._1.equals(c0)) {
+                    falsePositive.incrementAndGet();
+                } else {
+                    falseNegative.incrementAndGet();
+                }
+            });
+
+        var accuracy = (float) (trueNegative.get() + truePositive.get()) /
+            (truePositive.get() + trueNegative.get() + falseNegative.get() + falsePositive.get());
+        var precision = (float) truePositive.get() /
+            (truePositive.get() + falsePositive.get());
+        var recall = (float) truePositive.get() /
+            (truePositive.get() + falseNegative.get());
         var f1 = 2 * (recall * precision) / (recall + precision);
 
         System.out.printf(
@@ -37,7 +55,7 @@ public class Metrics {
                 Recall = %f.4
                 F1 = %f.4
                 """,
-            truePositive, trueNegative, falsePositive, falseNegative,
+            truePositive.get(), trueNegative.get(), falsePositive.get(), falseNegative.get(),
             accuracy, precision, recall, f1);
     }
 
