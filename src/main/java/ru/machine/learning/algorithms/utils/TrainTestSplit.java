@@ -10,7 +10,7 @@ import static java.lang.String.format;
 public class TrainTestSplit {
 
     // train, test, train labels, test labels
-    public static Tuple4<Table, Table, DoubleColumn, DoubleColumn> split(Table table, String targetName, double alpha) {
+    protected static Tuple4<Table, Table, DoubleColumn, DoubleColumn> split(Table table, String targetName, double alpha) {
         if (0 < alpha && alpha < 1) {
             var splitted = table.sampleSplit(alpha);
             var trainTarget = splitted[0].doubleColumn(targetName);
