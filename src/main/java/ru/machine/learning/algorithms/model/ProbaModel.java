@@ -1,4 +1,4 @@
-package ru.machine.learning.algorithms;
+package ru.machine.learning.algorithms.model;
 
 import io.vavr.Tuple2;
 import io.vavr.collection.Seq;

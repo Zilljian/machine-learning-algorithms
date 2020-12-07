@@ -1,4 +1,4 @@
-package ru.machine.learning.algorithms.knn;
+package ru.machine.learning.algorithms.model.knn;
 
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
@@ -12,7 +12,7 @@ import org.apache.commons.math3.ml.distance.ChebyshevDistance;
 import org.apache.commons.math3.ml.distance.DistanceMeasure;
 import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.ml.distance.ManhattanDistance;
-import ru.machine.learning.algorithms.Model;
+import ru.machine.learning.algorithms.model.Model;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Table;
 

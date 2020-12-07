@@ -1,4 +1,4 @@
-package ru.machine.learning.algorithms.bayes;
+package ru.machine.learning.algorithms.model.bayes;
 
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
@@ -8,7 +8,7 @@ import io.vavr.collection.Map;
 import io.vavr.collection.Seq;
 import io.vavr.collection.Stream;
 import io.vavr.collection.Traversable;
-import ru.machine.learning.algorithms.ProbaModel;
+import ru.machine.learning.algorithms.model.ProbaModel;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Row;
 import tech.tablesaw.api.Table;
