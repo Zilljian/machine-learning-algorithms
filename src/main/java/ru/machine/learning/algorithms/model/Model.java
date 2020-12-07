@@ -1,4 +1,4 @@
-package ru.machine.learning.algorithms;
+package ru.machine.learning.algorithms.model;
 
 import io.vavr.collection.Seq;
 import tech.tablesaw.api.DoubleColumn;
