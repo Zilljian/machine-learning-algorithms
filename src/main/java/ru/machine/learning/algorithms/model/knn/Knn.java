@@ -4,15 +4,16 @@ import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import io.vavr.collection.LinearSeq;
 import io.vavr.collection.List;
-import io.vavr.collection.List.Nil;
 import io.vavr.collection.Map;
 import io.vavr.collection.Traversable;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.math3.ml.distance.CanberraDistance;
 import org.apache.commons.math3.ml.distance.ChebyshevDistance;
 import org.apache.commons.math3.ml.distance.DistanceMeasure;
 import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.ml.distance.ManhattanDistance;
 import ru.machine.learning.algorithms.model.Model;
+import ru.machine.learning.algorithms.model.Util;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Table;
 
@@ -20,6 +21,7 @@ import javax.annotation.Nonnull;
 
 import static java.util.Comparator.comparing;
 
+@RequiredArgsConstructor
 public class Knn implements Model {
 
     enum Metric {
@@ -33,11 +35,6 @@ public class Knn implements Model {
     private final DistanceMeasure metric;
 
     private List<Tuple2<List<Double>, Double>> trainRowsToTarget;
-
-    public Knn(int k, DistanceMeasure metric) {
-        this.k = k;
-        this.metric = metric;
-    }
 
     public Knn(int k) {
         this.k = k;
@@ -65,7 +62,7 @@ public class Knn implements Model {
 
     @Override
     public Knn fit(@Nonnull Table train, @Nonnull DoubleColumn trainTarget) {
-        this.trainRowsToTarget = toList(train)
+        this.trainRowsToTarget = Util.toList(train)
             .zipWithIndex()
             .map(t -> t.map2(trainTarget::get));
         return this;
@@ -73,7 +70,7 @@ public class Knn implements Model {
 
     @Override
     public List<Double> predict(@Nonnull Table test) {
-        var testRows = toList(test);
+        var testRows = Util.toList(test);
         return testRows
             .map(e -> Tuple.of(e, trainRowsToTarget))
             .map(t -> t._2.map(train -> {
@@ -102,13 +99,5 @@ public class Knn implements Model {
         trainRow.zipWithIndex()
             .forEach(t -> trainRowArray[t._2] = t._1);
         return metric.compute(testRowArray, trainRowArray);
-    }
-
-    private List<List<Double>> toList(Table table) {
-        List<List<Double>> result = Nil.instance();
-        for (var e : table) {
-            result = result.prepend(List.ofAll(e.columnNames()).map(e::getNumber));
-        }
-        return result;
     }
 }

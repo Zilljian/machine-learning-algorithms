@@ -9,6 +9,7 @@ import io.vavr.collection.Seq;
 import io.vavr.collection.Stream;
 import io.vavr.collection.Traversable;
 import ru.machine.learning.algorithms.model.ProbaModel;
+import ru.machine.learning.algorithms.model.Util;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Row;
 import tech.tablesaw.api.Table;
@@ -41,7 +42,7 @@ public class GaussianNaiveBayes implements ProbaModel {
     @Override
     public GaussianNaiveBayes fit(@Nonnull Table train, @Nonnull DoubleColumn trainTarget) {
         this.trainTargetLabels = List.ofAll(trainTarget.asList());
-        this.trainColNameToValues = listOnColumn(train);
+        this.trainColNameToValues = Util.toListOnColumn(train);
         return this;
     }
 
@@ -97,14 +98,6 @@ public class GaussianNaiveBayes implements ProbaModel {
             )
             .maxBy(comparing(Tuple2::_2))
             .get();
-    }
-
-    private Map<String, List<Double>> listOnColumn(Table train) {
-        return List.ofAll(train.columns())
-            .map(c -> List.ofAll(((DoubleColumn) c).asList()))
-            .map(List::ofAll)
-            .zip(List.ofAll(train.columnNames()))
-            .toMap(Tuple2::_2, Tuple2::_1);
     }
 
     private Map<Double, Double> priorLabelsProbabilities() {
