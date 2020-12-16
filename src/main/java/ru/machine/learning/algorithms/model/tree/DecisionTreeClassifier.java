@@ -12,6 +12,8 @@ import lombok.experimental.Accessors;
 import ru.machine.learning.algorithms.model.Model;
 import ru.machine.learning.algorithms.model.Util;
 import ru.machine.learning.algorithms.model.tree.Condition.Operation;
+import ru.machine.learning.algorithms.model.tree.metric.InformationGain;
+import ru.machine.learning.algorithms.model.tree.metric.SplitMetric;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Table;
 
@@ -20,7 +22,6 @@ import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 
 import static java.util.Comparator.comparing;
-import static java.util.Comparator.comparingDouble;
 import static java.util.function.Predicate.not;
 
 @Setter
@@ -34,6 +35,7 @@ public class DecisionTreeClassifier implements Model {
     private Map<String, Integer> colNameToIndex;
     private List<String> colNames;
     private Map<String, Boolean> categorical;
+    private SplitMetric splitMetric = new InformationGain();
 
     @Override
     public Model fit(@Nonnull Table train, @Nonnull DoubleColumn trainTarget) {
@@ -55,6 +57,7 @@ public class DecisionTreeClassifier implements Model {
         this.categorical = root.getCols()
             .mapValues(v -> v.toSet().size())
             .toMap(t -> t.map2(v -> categoricalColNames.contains(t._1) || v < 5));
+        this.splitMetric.setCategoricalCols(categorical);
 
         var list = List.of(root);
         while (depth++ < N && list.nonEmpty()) {
@@ -105,6 +108,11 @@ public class DecisionTreeClassifier implements Model {
         return this;
     }
 
+    public Model withSplitMetric(SplitMetric splitMetric) {
+        this.splitMetric = splitMetric.setCategoricalCols(categorical);
+        return this;
+    }
+
     private List<Node> trySplit(Node node) {
         split(node);
         var list = List.<Node>empty();
@@ -118,18 +126,7 @@ public class DecisionTreeClassifier implements Model {
     }
 
     private Node split(Node node) {
-        var classes = node.getRowToTarget()
-            .map(Tuple2::_2)
-            .groupBy(Function.identity())
-            .mapValues(Traversable::size);
-        var currentEntropy = computeEntropy(classes, node.getRowToTarget().size());
-        var splitCandidates = node.getCols()
-            .map(t2 -> Tuple.of(t2._1, t2._2, node.getTarget()))
-            .map(t3 -> categorical.getOrElse(t3._1, false) ?
-                       choose(t3._2, t3._3, currentEntropy).append(t3._1) :
-                       chooseWithContinuous(t3._2, t3._3, currentEntropy).append(t3._1)
-            );
-        var withMaxGain = splitCandidates.maxBy(comparingDouble(t -> t._2)).get();
+        var withMaxGain = splitMetric.findBestSplitCandidate(node.getCols(), node.getTarget());
         var splitCondition = conditionOf(withMaxGain);
         var sortedData = node.getRowToTarget()
             .sorted(comparing(t -> t._1.get(splitCondition.getFeatureIndex())));
@@ -143,51 +140,6 @@ public class DecisionTreeClassifier implements Model {
             .setLeft(nodeOf(splittedData1))
             .setRight(nodeOf(splitedData2));
         return node;
-    }
-
-    private Tuple2<Double, Double> choose(List<Double> values, List<Double> target, Double parentEntropy) {
-        double n = values.size();
-        var featureToEntropy = values // col values
-            .zip(target)// zip with target
-            .groupBy(Tuple2::_1) // group by unique feature values
-            .mapValues(v -> v.map(Tuple2::_2)) // map to: unique val -> target
-            .mapValues(v -> Tuple.of(
-                v.groupBy(Function.identity())
-                    .mapValues(Traversable::size),
-                v.size())
-            ) // map to: unique val -> (map: unique target -> count)
-            .mapValues(t2 -> t2.map1(v -> computeEntropy(v, t2._2))); // calculate entropy for each unique feature value
-        var weightedSum = featureToEntropy.values()
-            .map(x -> x._1 * (x._2 / n))
-            .reduce(Double::sum);
-        var minEntropyValue = featureToEntropy
-            .minBy(t -> t._2._1)
-            .map(Tuple2::_1).get();
-        var informationGain = parentEntropy - weightedSum;
-        return Tuple.of(minEntropyValue, informationGain);
-    }
-
-    private Tuple2<Double, Double> chooseWithContinuous(List<Double> values, List<Double> target, Double parentEntropy) {
-        double n = values.size();
-
-        var splitsOfValues =
-            List.<Tuple2<List<Tuple2<Double, Double>>, List<Tuple2<Double, Double>>>>empty();
-        var sorted = values
-            .zip(target)// zip with target
-            .sorted(comparing(Tuple2::_1));
-
-        for (var i : List.range(1, sorted.size())) {
-            splitsOfValues = splitsOfValues.append(sorted.splitAt(i));
-        }
-
-        var maxInformationGainSplit = splitsOfValues
-            .map(selectThreshold())
-            .map(computeInformationGain(parentEntropy, n))
-            .maxBy(t2 -> t2._2)
-            .get();
-        var minEntropyValue = maxInformationGainSplit._1;
-        var maxInformationGain = maxInformationGainSplit._2;
-        return Tuple.of(minEntropyValue, maxInformationGain);
     }
 
     private Tuple2<
@@ -233,42 +185,5 @@ public class DecisionTreeClassifier implements Model {
                 case GREATER -> value > splitter;
             };
         };
-    }
-
-    private Function<
-        Tuple2<List<Tuple2<Double, Double>>, List<Tuple2<Double, Double>>>,
-        Tuple3<Double, List<Double>, List<Double>>> selectThreshold() {
-        return t2 -> {
-            var splitValue = t2._1.map(Tuple2::_1).min().get();
-            return Tuple.of(splitValue, t2._1.map(Tuple2::_2), t2._2.map(Tuple2::_2));
-        };
-    }
-
-    private Function<
-        Tuple3<Double, List<Double>, List<Double>>,
-        Tuple2<Double, Double>> computeInformationGain(double parentEntropy, double n) {
-        return t3 -> {
-            var leftSize = t3._2.size();
-            var leftPart = t3._2
-                .groupBy(Function.identity())
-                .mapValues(Traversable::size);
-            var leftPartEntropy = computeEntropy(leftPart, leftSize);
-            var rightSize = t3._3.size();
-            var rightPart = t3._3
-                .groupBy(Function.identity())
-                .mapValues(Traversable::size);
-            var rightPartEntropy = computeEntropy(rightPart, rightSize);
-            var weightedSum = leftPartEntropy * (leftSize / n) + rightPartEntropy * (rightSize / n);
-            var informationGain = parentEntropy - weightedSum;
-            return Tuple.of(t3._1, informationGain);
-        };
-    }
-
-    private Double computeEntropy(Map<Double, Integer> map, double n) {
-        var logBase = Math.log(2);
-        return map
-            .mapValues(x -> -(x / n) * Math.log(x / n) / logBase)
-            .values()
-            .reduce(Double::sum);
     }
 }
