@@ -42,4 +42,11 @@ public class Util {
         }
         return colNames.zip(cols).toMap(Function.identity());
     }
+
+    public static double[] listToArray(List<Double> list) {
+        var array = new double[list.size()];
+        list.zipWithIndex()
+            .forEach(t -> array[t._2] = t._1);
+        return array;
+    }
 }
