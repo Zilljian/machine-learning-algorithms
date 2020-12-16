@@ -4,6 +4,7 @@ import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import io.vavr.collection.List;
 import io.vavr.collection.Map;
+import io.vavr.collection.Seq;
 import io.vavr.collection.Traversable;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.math3.ml.distance.DistanceMeasure;
@@ -52,7 +53,7 @@ public class Knn implements Model {
     }
 
     @Override
-    public List<Double> predict(@Nonnull Table test) {
+    public Seq<Double> predict(@Nonnull Table test) {
         var testRows = Util.toList(test);
         return testRows
             .map(r -> trainRowsToTarget.map(train -> {
