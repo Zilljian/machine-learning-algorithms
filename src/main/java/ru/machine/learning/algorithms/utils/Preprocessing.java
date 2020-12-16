@@ -66,6 +66,12 @@ public class Preprocessing {
         return this;
     }
 
+    public Preprocessing trainTestSplitWith(String target, double alpha, long seed) {
+        TrainTestSplit.setSeed(seed);
+        this.splitted = TrainTestSplit.split(this.table, target, alpha);
+        return this;
+    }
+
     // For metrics purpose only
     public Preprocessing peek(Consumer<Table> func) {
         func.accept(this.table.copy());
