@@ -7,7 +7,8 @@ import io.vavr.collection.List;
 import io.vavr.collection.Map;
 import io.vavr.collection.Seq;
 import io.vavr.collection.Traversable;
-import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import ru.machine.learning.algorithms.model.Model;
 import ru.machine.learning.algorithms.model.Util;
 import ru.machine.learning.algorithms.model.tree.Condition.Operation;
@@ -22,11 +23,12 @@ import static java.util.Comparator.comparing;
 import static java.util.Comparator.comparingDouble;
 import static java.util.function.Predicate.not;
 
-@RequiredArgsConstructor
+@Setter
+@Accessors(chain = true)
 public class DecisionTreeClassifier implements Model {
 
     private Node root;
-    private final int N;
+    private int N = Integer.MAX_VALUE;
     private int depth = 0;
     private List<String> categoricalColNames = List.empty();
     private Map<String, Integer> colNameToIndex;
@@ -55,7 +57,7 @@ public class DecisionTreeClassifier implements Model {
             .toMap(t -> t.map2(v -> categoricalColNames.contains(t._1) || v < 5));
 
         var list = List.of(root);
-        while (depth++ < 100000 && list.nonEmpty()) {
+        while (depth++ < N && list.nonEmpty()) {
             var tmp = List.<Node>empty();
             for (var node : list) {
                 tmp = tmp.appendAll(trySplit(node));
@@ -74,28 +76,26 @@ public class DecisionTreeClassifier implements Model {
     public Double traverse(Node node, List<Double> row) {
         var condition = node.getCondition();
         if (condition == null) {
-            return node.getTarget().get(0);
+            return node.getTarget()
+                .groupBy(Function.identity())
+                .mapValues(Traversable::size)
+                .maxBy(Tuple2::_2)
+                .get()._1;
         }
         return switch (condition.getOperation()) {
             case EQUAL -> {
                 if (row.get(condition.getFeatureIndex()).equals(condition.getValue())) {
-                    if (node.hasLeft()) {
-                        yield traverse(node.getLeft(), row);
-                    }
-                } else if (node.hasRight()) {
+                    yield traverse(node.getLeft(), row);
+                } else {
                     yield traverse(node.getRight(), row);
                 }
-                yield node.getTarget().get(0);
             }
             case GREATER -> {
                 if (row.get(condition.getFeatureIndex()) > condition.getValue()) {
-                    if (node.hasLeft()) {
-                        yield traverse(node.getLeft(), row);
-                    }
-                } else if (node.hasRight()) {
+                    yield traverse(node.getLeft(), row);
+                } else {
                     yield traverse(node.getRight(), row);
                 }
-                yield node.getTarget().get(0);
             }
         };
     }
