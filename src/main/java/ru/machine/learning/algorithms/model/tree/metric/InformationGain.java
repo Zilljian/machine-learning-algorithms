@@ -10,17 +10,17 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 import static java.util.Comparator.comparing;
 import static java.util.Comparator.comparingDouble;
+import static java.util.function.Predicate.not;
 
 @Setter
 @Accessors(chain = true)
 public class InformationGain implements SplitMetric {
 
     private Map<String, Boolean> categoricalCols;
-    private int minEntries = 25;
+    private int minEntries = 10;
 
     @Override
     public Tuple3<Double, Double, String> findBestSplitCandidate(Map<String, List<Double>> colValues, List<Double> target) {
@@ -34,42 +34,26 @@ public class InformationGain implements SplitMetric {
 
     private Tuple2<Double, Double> choose(List<Double> values, List<Double> target) {
         double n = values.size();
-        var featureToEntropy = values // col values
-            .zip(target)// zip with target
+
+        var valueToTarget = values
+            .zip(target);
+        var maxInformationGainSplit = valueToTarget
             .groupBy(Tuple2::_1) // group by unique feature values
-            .mapValues(v -> v.map(Tuple2::_2)) // map to: unique val -> targets
-            .mapValues(toTargetWithCount()) // map to: unique val -> (map: unique target -> count);
-            .filterValues(withSmallSplits())
-            .mapValues(toEntropy());// calculate entropy for each unique feature value
+            .mapValues(v -> v.map(Tuple2::_2))
+            .map(t -> t.append(valueToTarget.filter(not(t2 -> t2._1.equals(t._1))).map(Tuple2::_2))) // zip with all other value
+            .filter(t3 -> t3._2.size() > minEntries && t3._3.size() > minEntries)
+            .map(computeInformationGain(n))
+            .maxBy(Tuple2::_2)
+            .getOrNull(); // calculate entropy for each unique feature value
 
         // if cannot be splitted
-        if (featureToEntropy.isEmpty()) {
+        if (maxInformationGainSplit == null) {
             return Tuple.of(-1d, -1d);
         }
-        var weightedSum = featureToEntropy.values()
-            .map(x -> x._1 * (x._2 / n))
-            .reduce(Double::sum);
-        var minEntropyValue = featureToEntropy
-            .minBy(t -> t._2._1)
-            .map(Tuple2::_1).get();
-        var informationGain = 1 - weightedSum;
-        return Tuple.of(minEntropyValue, informationGain);
-    }
 
-    private Predicate<Tuple2<Map<Double, Integer>, Integer>> withSmallSplits() {
-        return t -> t._1.filterValues(v -> v < minEntries).isEmpty();
-    }
-
-    private Function<Tuple2<Map<Double, Integer>, Integer>, Tuple2<Double, Integer>> toEntropy() {
-        return t -> t.map1(m -> computeEntropy(m, t._2));
-    }
-
-    private Function<List<Double>, Tuple2<Map<Double, Integer>, Integer>> toTargetWithCount() {
-        return v -> Tuple.of(
-            v.groupBy(Function.identity())
-                .mapValues(Traversable::size),
-            v.size()
-        );
+        var splitValue = maxInformationGainSplit._1;
+        var maxInformationGain = maxInformationGainSplit._2;
+        return Tuple.of(splitValue, maxInformationGain);
     }
 
     private Tuple2<Double, Double> chooseWithContinuous(List<Double> values, List<Double> target) {
@@ -88,9 +72,9 @@ public class InformationGain implements SplitMetric {
             return Tuple.of(-1d, -1d);
         }
 
-        var minEntropyValue = maxInformationGainSplit._1;
+        var splitValue = maxInformationGainSplit._1;
         var maxInformationGain = maxInformationGainSplit._2;
-        return Tuple.of(minEntropyValue, maxInformationGain);
+        return Tuple.of(splitValue, maxInformationGain);
     }
 
     private List<Tuple2<List<Tuple2<Double, Double>>, List<Tuple2<Double, Double>>>> splitOnEachValue(List<Double> values, List<Double> target) {
