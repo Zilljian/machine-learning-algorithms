@@ -12,7 +12,7 @@ import lombok.experimental.Accessors;
 import ru.machine.learning.algorithms.model.Model;
 import ru.machine.learning.algorithms.model.Util;
 import ru.machine.learning.algorithms.model.tree.Condition.Operation;
-import ru.machine.learning.algorithms.model.tree.metric.InformationGain;
+import ru.machine.learning.algorithms.model.tree.metric.GiniIndex;
 import ru.machine.learning.algorithms.model.tree.metric.SplitMetric;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Table;
@@ -35,7 +35,7 @@ public class DecisionTreeClassifier implements Model {
     private Map<String, Integer> colNameToIndex;
     private List<String> colNames;
     private Map<String, Boolean> categorical;
-    private SplitMetric splitMetric = new InformationGain();
+    private SplitMetric splitMetric = new GiniIndex().setMinEntries(15);
 
     @Override
     public Model fit(@Nonnull Table train, @Nonnull DoubleColumn trainTarget) {
