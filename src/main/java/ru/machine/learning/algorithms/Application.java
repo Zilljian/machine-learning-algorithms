@@ -2,6 +2,10 @@ package ru.machine.learning.algorithms;
 
 import io.vavr.collection.List;
 import ru.machine.learning.algorithms.model.bayes.GaussianNaiveBayes;
+import ru.machine.learning.algorithms.model.knn.Knn;
+import ru.machine.learning.algorithms.model.knn.Metric;
+import ru.machine.learning.algorithms.model.tree.DecisionTreeClassifier;
+import ru.machine.learning.algorithms.model.tree.metric.GiniIndex;
 import ru.machine.learning.algorithms.utils.Metrics;
 import ru.machine.learning.algorithms.utils.Pipeline;
 
@@ -25,14 +29,30 @@ public class Application {
             .peekSplitted(Metrics::describeData)
             .splitted();
 
-        for (var n : List.range(1, 2)) {
-            System.out.printf("\n\nN = %d\n\n", n);
-            var predicted = Metrics.withTime(
-                () -> new GaussianNaiveBayes()
-                    .fit(splitted._1, splitted._3)
-                    .predict(splitted._2)
-            );
-            Metrics.printBinaryClassificationMetrics(List.ofAll(splitted._4.asList()), predicted);
-        }
+        System.out.println("\nKnn with n = 5:\n");
+        var predicted = Metrics.withTime(
+            () -> new Knn(10)
+                .withMetric(Metric.Chebyshev)
+                .fit(splitted._1, splitted._3)
+                .predict(splitted._2)
+        );
+        Metrics.printBinaryClassificationMetrics(List.ofAll(splitted._4.asList()), predicted);
+
+        System.out.println("\nDecision tree:\n");
+        predicted = Metrics.withTime(
+            () -> new DecisionTreeClassifier()
+                .withSplitMetric(new GiniIndex().setMinEntries(22))
+                .fit(splitted._1, splitted._3)
+                .predict(splitted._2)
+        );
+        Metrics.printBinaryClassificationMetrics(List.ofAll(splitted._4.asList()), predicted);
+
+        System.out.println("\nGaussian Naive Bayes:\n");
+        predicted = Metrics.withTime(
+            () -> new GaussianNaiveBayes()
+                .fit(splitted._1, splitted._3)
+                .predict(splitted._2)
+        );
+        Metrics.printBinaryClassificationMetrics(List.ofAll(splitted._4.asList()), predicted);
     }
 }
