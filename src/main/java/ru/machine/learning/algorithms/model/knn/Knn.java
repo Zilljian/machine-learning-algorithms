@@ -22,18 +22,17 @@ import static java.util.Comparator.comparing;
 public class Knn implements Model {
 
     private final int k;
-    private final DistanceMeasure metric;
+    private DistanceMeasure metric = new EuclideanDistance();
 
     private List<Tuple2<List<Double>, Double>> trainRowsToTarget;
 
-    public Knn(int k) {
-        this.k = k;
-        this.metric = new EuclideanDistance();
-    }
-
     public Knn() {
         this.k = 5;
-        this.metric = new EuclideanDistance();
+    }
+
+    public Knn(int k, DistanceMeasure metric) {
+        this.k = 5;
+        this.metric = metric;
     }
 
     public static Knn withParams(@Nonnull Map<String, ?> params) {
@@ -42,6 +41,11 @@ public class Knn implements Model {
         var metric = (Metric) params.get("metric")
             .getOrElseThrow(() -> new RuntimeException("Param 'metric' is expected, but doesn't exist"));
         return new Knn(k, metric.get());
+    }
+
+    public Knn withMetric(Metric metric) {
+        this.metric = metric.get();
+        return this;
     }
 
     @Override
